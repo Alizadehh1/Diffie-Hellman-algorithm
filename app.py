@@ -1,11 +1,11 @@
 import pyodbc
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from cryptography.hazmat.primitives.asymmetric import dh
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 import bcrypt
 import os
-import uuid
+import random
+import string
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 from datetime import datetime, timedelta
@@ -50,11 +50,22 @@ def init_db():
         END;
         """)
         conn.commit()
+        
+        # Backup codes table creation
+        cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BackupCodes' AND xtype='U')
+        BEGIN
+            CREATE TABLE BackupCodes (
+                code NVARCHAR(255) PRIMARY KEY,
+                user_id INT,
+                is_used BIT,
+                expiration_date DATETIME
+            );
+        END;
+        """)
+        conn.commit()
 
-@app.route('/')
-def index():
-    return render_template('index.html')
-
+# Route to handle user registration
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -86,11 +97,25 @@ def register():
             """, (username, email, hashed_password.decode('utf-8'), salt.decode('utf-8'), serialized_public_key, created_at, created_at, 1, 0))
             conn.commit()
 
+        # Generate backup codes for the user after registration
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT user_id FROM Users WHERE username = ?', (username,))
+            user = cursor.fetchone()
+            user_id = user[0]  # Get the user ID from the database
+
+            # Generate and store backup codes
+            backup_codes = generate_backup_codes(user_id)
+        
         flash('Account successfully created!', 'success')
-        return redirect(url_for('index'))
+        return render_template('register.html', backup_codes=backup_codes)  # Pass the backup codes to the template
 
     return render_template('register.html')
 
+
+
+# Route for the login page
+# This is your normal login method, which can be left unchanged if you don't want to alter it further.
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -110,11 +135,12 @@ def login():
             
             # Check if the provided password matches the stored hash
             if bcrypt.checkpw(password.encode('utf-8'), stored_password):
-                # Login successful
+                # Normal login successful
                 session['user_id'] = user.user_id
                 session['username'] = user.username
                 flash('Login successful!', 'success')
                 return redirect(url_for('dashboard'))
+
             else:
                 flash('Incorrect password. Please try again.', 'danger')
         else:
@@ -122,13 +148,63 @@ def login():
 
     return render_template('login.html')
 
-
+# Route for the user dashboard
 @app.route('/dashboard')
 def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    
     return render_template('dashboard.html', username=session['username'])
 
+# Route to handle login via backup code
+@app.route('/login_via_backup_code', methods=['GET', 'POST'])
+def login_via_backup_code():
+    if request.method == 'POST':
+        username = request.form['username']
+        backup_code = request.form['backup_code']
+
+        # Fetch the user from the database
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM Users WHERE username = ?', (username,))
+            user = cursor.fetchone()
+
+        if user:
+            # Retrieve backup codes for the user
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT code, is_used, expiration_date FROM BackupCodes WHERE user_id = ?", (user[0],))
+                backup_codes = cursor.fetchall()
+
+            # Check if the entered backup code matches any stored code
+            for code, is_used, expiration_date in backup_codes:
+                if bcrypt.checkpw(backup_code.encode('utf-8'), code.encode('utf-8')) and not is_used and expiration_date > datetime.now():
+                    # Valid backup code, mark as used
+                    with get_db_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            UPDATE BackupCodes SET is_used = 1 WHERE code = ?
+                        """, (code,))
+                        conn.commit()
+
+                    # Store user in session and log them in
+                    session['user_id'] = user[0]
+                    session['username'] = user[1]
+                    flash('Backup code verified successfully! You are now logged in.', 'success')
+                    return redirect(url_for('dashboard'))
+
+            flash('Invalid backup code. Please try again.', 'danger')
+        else:
+            flash('Username does not exist. Please try again.', 'danger')
+
+    return render_template('login_via_backup_code.html')
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# Route for logout
 @app.route('/logout')
 def logout():
     session.clear()
@@ -138,6 +214,7 @@ def logout():
 # Initialize the serializer (used to sign the reset token)
 s = URLSafeTimedSerializer(app.secret_key)
 
+# Route for password reset request
 @app.route('/request_reset', methods=['GET', 'POST'])
 def request_reset():
     if request.method == 'POST':
@@ -182,6 +259,7 @@ def send_reset_email(to, reset_url):
     msg.body = f'Click the following link to reset your password: {reset_url}'
     mail.send(msg)
 
+# Route for resetting password
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
     try:
@@ -211,6 +289,77 @@ def reset_password(token):
         return redirect(url_for('login'))
 
     return render_template('reset_password.html', token=token)
+
+# Helper function to generate random backup codes
+def generate_backup_codes(user_id, n=10, length=8, expiration_hours=720):
+    codes = []
+    expiration_date = datetime.now() + timedelta(hours=expiration_hours)
+    
+    for _ in range(n):
+        code = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+        hashed_code = bcrypt.hashpw(code.encode('utf-8'), bcrypt.gensalt())
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO BackupCodes (code, user_id, is_used, expiration_date)
+                VALUES (?, ?, 0, ?)
+            """, (hashed_code.decode('utf-8'), user_id, expiration_date))
+            conn.commit()
+        
+        codes.append(code)
+
+    return codes
+
+# Route to handle 2FA setup and backup code generation
+@app.route('/enable_2fa', methods=['GET', 'POST'])
+def enable_2fa():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        # Generate and hash backup codes
+        backup_codes = generate_backup_codes(session['user_id'])
+        flash('Backup codes generated. Please save them safely', 'success')
+        return redirect(url_for('dashboard'))
+
+    return render_template('enable_2fa.html')
+
+@app.route('/verify_backup_code', methods=['GET', 'POST'])
+def verify_backup_code():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        backup_code = request.form['backup_code']
+        
+        # Retrieve the user's backup codes from the database
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT code, is_used, expiration_date FROM BackupCodes WHERE user_id = ?", (session['user_id'],))
+            backup_codes = cursor.fetchall()
+
+        # Check if the entered backup code matches any stored code
+        for code, is_used, expiration_date in backup_codes:
+            if bcrypt.checkpw(backup_code.encode('utf-8'), code.encode('utf-8')) and not is_used and expiration_date > datetime.now():
+                # Valid backup code, mark as used
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE BackupCodes SET is_used = 1 WHERE code = ?
+                    """, (code,))
+                    conn.commit()
+
+                # Redirect user to the dashboard after successful verification
+                flash('Backup code verified successfully!', 'success')
+                return redirect(url_for('dashboard'))
+
+        flash('Invalid backup code. Please try again.', 'danger')
+
+    return render_template('verify_backup_code.html')
+
+
+
 
 
 if __name__ == '__main__':

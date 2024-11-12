@@ -7,15 +7,25 @@
 </head>
 <body>
     <h1>Create an Account</h1>
-    <form action="{{ url_for('register') }}" method="POST">
+    <!-- templates/register.html -->
+    <h2>Register</h2>
+    <form method="POST">
         <label for="username">Username:</label>
-        <input type="text" id="username" name="username" required><br><br>
-
+        <input type="text" id="username" name="username" required>
+        
         <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required><br><br>
-
+        <input type="email" id="email" name="email" required>
+        
         <label for="password">Password:</label>
-        <input type="password" id="password" name="password" required><br><br>
+        <input type="password" id="password" name="password" required>
+
+        <h3>Backup Codes</h3>
+        <p>Please store the following backup codes in a safe place. These codes will be used if you lose access to your 2FA method.</p>
+        <ul>
+            {% for code in backup_codes %}
+            <li>{{ code }}</li>
+            {% endfor %}
+        </ul>
 
         <button type="submit">Register</button>
     </form>
