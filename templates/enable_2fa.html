@@ -3,20 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Enable 2FA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <!-- templates/enable_2fa.html -->
-<h2>Backup Codes</h2>
-<p>Below are your backup codes. Please save them in a safe place. You will need them if you lose access to your two-factor authentication method.</p>
-<ul>
-    {% for code in backup_codes %}
-    <li>{{ code }}</li>
-    {% endfor %}
-</ul>
-<form method="post">
-    <button type="submit">Finish Setup</button>
-</form>
-
+    <div class="container">
+        <h2>Backup Codes</h2>
+        <p>Below are your backup codes. Please save them in a safe place.</p>
+        <ul>
+            {% for code in backup_codes %}
+            <li>{{ code }}</li>
+            {% endfor %}
+        </ul>
+        <form method="post">
+            <button type="submit">Finish Setup</button>
+        </form>
+        <div class="spacing">
+            <a href="{{ url_for('index') }}">Back to Home</a>
+        </div>
+    </div>
 </body>
 </html>

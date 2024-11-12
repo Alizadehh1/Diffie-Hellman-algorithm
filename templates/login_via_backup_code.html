@@ -3,23 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Login via Backup Code</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-<!-- login_via_backup_code.html -->
-<form method="POST">
-    <div class="form-group">
-        <label for="username">Username:</label>
-        <input type="text" name="username" required>
+    <div class="container">
+        <h2>Login via Backup Code</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul>
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="backup_code">Backup Code:</label>
+                <input type="text" name="backup_code" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+        <div class="spacing">
+            <a href="{{ url_for('index') }}">Back to Home</a>
+        </div>
     </div>
-    <div class="form-group">
-        <label for="backup_code">Backup Code:</label>
-        <input type="text" name="backup_code" required>
-    </div>
-    <button type="submit" class="btn btn-primary">Login via Backup Code</button>
-</form>
-
-
-
 </body>
 </html>

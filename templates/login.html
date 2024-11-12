@@ -3,35 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <title>Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h2>Login</h2>
-
-    <!-- Display Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <ul>
-                {% for category, message in messages %}
-                    <li class="{{ category }}">{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
-
-    <form method="POST">
-        <div class="form-group">
-            <label for="username">Username:</label>
-            <input type="text" name="username" required>
+    <div class="container">
+        <h2>Login</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul>
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+        <div class="spacing">
+            <a href="{{ url_for('login_via_backup_code') }}" class="btn btn-secondary">Login via Backup Code</a>
         </div>
-        <div class="form-group">
-            <label for="password">Password:</label>
-            <input type="password" name="password" required>
+        <div class="spacing">
+            <a href="{{ url_for('request_reset') }}">Forgot your password?</a>
         </div>
-        <button type="submit" class="btn btn-primary">Login</button>
-    </form>
-    
-    <!-- Button to log in via backup code -->
-    <a href="{{ url_for('login_via_backup_code') }}" class="btn btn-secondary">Login via Backup Code</a>
-    
+        <div class="spacing">
+            <a href="{{ url_for('index') }}">Back to Home</a>
+        </div>
+    </div>
 </body>
 </html>

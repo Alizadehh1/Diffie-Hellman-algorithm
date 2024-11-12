@@ -4,31 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h1>Create an Account</h1>
-    <!-- templates/register.html -->
-    <h2>Register</h2>
-    <form method="POST">
-        <label for="username">Username:</label>
-        <input type="text" id="username" name="username" required>
-        
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required>
-        
-        <label for="password">Password:</label>
-        <input type="password" id="password" name="password" required>
-
-        <h3>Backup Codes</h3>
-        <p>Please store the following backup codes in a safe place. These codes will be used if you lose access to your 2FA method.</p>
-        <ul>
-            {% for code in backup_codes %}
-            <li>{{ code }}</li>
-            {% endfor %}
-        </ul>
-
-        <button type="submit">Register</button>
-    </form>
-    <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+    <div class="container">
+        <h1>Create an Account</h1>
+        <h2>Register</h2>
+        <form method="POST">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required>
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            <h3>Backup Codes</h3>
+            <p>Please store the following backup codes in a safe place.</p>
+            <ul>
+                {% for code in backup_codes %}
+                <li>{{ code }}</li>
+                {% endfor %}
+            </ul>
+            <button type="submit">Register</button>
+        </form>
+        <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+        <div class="spacing">
+            <a href="{{ url_for('index') }}">Back to Home</a>
+        </div>
+    </div>
 </body>
 </html>
