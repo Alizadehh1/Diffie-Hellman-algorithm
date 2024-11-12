@@ -29,9 +29,9 @@ def init_db():
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Users' AND xtype='U')
         BEGIN
-            CREATE TABLE users (
+            CREATE TABLE Users (
                 user_id INT PRIMARY KEY IDENTITY(1,1),
                 username NVARCHAR(255) NOT NULL UNIQUE,
                 email NVARCHAR(255),
@@ -78,7 +78,7 @@ def register():
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-            INSERT INTO users (username, email, hashed_password, salt, dh_public_key, created_at, updated_at, is_active, is_locked)
+            INSERT INTO Users (username, email, hashed_password, salt, dh_public_key, created_at, updated_at, is_active, is_locked)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (username, email, hashed_password.decode('utf-8'), salt.decode('utf-8'), serialized_public_key, created_at, created_at, 1, 0))
             conn.commit()
@@ -97,24 +97,28 @@ def login():
         # Fetch the user from the database
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM users WHERE username = ?', (username,))
+            cursor.execute('SELECT * FROM Users WHERE username = ?', (username,))
             user = cursor.fetchone()
 
         if user:
             # Retrieve the salt and compare passwords
             stored_salt = user.salt.encode('utf-8')  # Ensure salt is in bytes format
-            if bcrypt.checkpw(password.encode('utf-8'), user.hashed_password.encode('utf-8')):
+            stored_password = user.hashed_password.encode('utf-8')  # Ensure hashed password is in bytes format
+            
+            # Check if the provided password matches the stored hash
+            if bcrypt.checkpw(password.encode('utf-8'), stored_password):
+                # Login successful
                 session['user_id'] = user.user_id
                 session['username'] = user.username
                 flash('Login successful!', 'success')
                 return redirect(url_for('dashboard'))
             else:
-                flash('Invalid username or password!', 'danger')
-
+                flash('Incorrect password. Please try again.', 'danger')
         else:
-            flash('Invalid username or password!', 'danger')
+            flash('Username does not exist. Please try again.', 'danger')
 
     return render_template('login.html')
+
 
 @app.route('/dashboard')
 def dashboard():
