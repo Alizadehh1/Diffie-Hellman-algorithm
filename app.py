@@ -6,6 +6,7 @@ import bcrypt
 import os
 import random
 import string
+import re
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 from datetime import datetime, timedelta
@@ -65,13 +66,47 @@ def init_db():
         """)
         conn.commit()
 
-# Route to handle user registration
+def check_password_policy(password):
+    # Minimum length
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    
+    # Uppercase letter
+    if not re.search(r'[A-Z]', password):
+        return False, "Password must contain at least one uppercase letter."
+    
+    # Lowercase letter
+    if not re.search(r'[a-z]', password):
+        return False, "Password must contain at least one lowercase letter."
+    
+    # Digit
+    if not re.search(r'[0-9]', password):
+        return False, "Password must contain at least one digit."
+    
+    # Special character
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, "Password must contain at least one special character."
+    
+    # No simple patterns (for example: password123, 12345, qwerty)
+    common_patterns = ['password', '1234', 'qwerty', 'letmein', 'welcome', 'admin']
+    if any(pattern in password.lower() for pattern in common_patterns):
+        return False, "Password contains a common pattern or is easily guessable."
+    
+    return True, "Password is strong."
+
+# Updated registration route
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         email = request.form['email']
+        
+        # Check password policy
+        is_valid, message = check_password_policy(password)
+        if not is_valid:
+            flash(message, 'danger')
+            return redirect(url_for('register'))  # Redirect back to registration page
         
         # Hash the password and generate salt
         salt = bcrypt.gensalt()
@@ -111,8 +146,6 @@ def register():
         return render_template('register.html', backup_codes=backup_codes)  # Pass the backup codes to the template
 
     return render_template('register.html')
-
-
 
 # Route for the login page
 # This is your normal login method, which can be left unchanged if you don't want to alter it further.
@@ -291,7 +324,7 @@ def reset_password(token):
     return render_template('reset_password.html', token=token)
 
 # Helper function to generate random backup codes
-def generate_backup_codes(user_id, n=10, length=8, expiration_hours=720):
+def generate_backup_codes(user_id, n=10, length=8, expiration_hours=168):
     codes = []
     expiration_date = datetime.now() + timedelta(hours=expiration_hours)
     
